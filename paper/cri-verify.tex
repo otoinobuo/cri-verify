@@ -1,0 +1,487 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=25mm]{geometry}
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm,booktabs,url,microtype,enumitem}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage[hidelinks]{hyperref}
+\setlength{\emergencystretch}{3em}
+
+\newtheorem{theorem}{Theorem}
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}
+
+\newcommand{\lean}[1]{\texttt{#1}}
+\newcommand{\cri}[1]{\texttt{#1}}
+\newcommand{\uri}[1]{\texttt{#1}}
+\newcommand{\rds}{\mathrm{rds}}
+\newcommand{\mergef}{\mathrm{merge}}
+\newcommand{\take}[1]{\mathrm{take}_{#1}}
+\newcommand{\dl}{\mathrm{dropLast}}
+\newcommand{\res}{\rho_{5.3}}
+\newcommand{\rfc}{\rho_{3986}}
+\newcommand{\conv}{\mathrm{conv}}
+\newcommand{\e}{\varepsilon}
+\newcommand{\seq}[1]{[#1]}
+\newtheorem{lemma}{Lemma}
+
+\title{Three Counterexamples and One-Sentence Corrections\\
+for IETF Internet-Draft draft-ietf-core-href-30,\\
+with a Lean Proof for the Path Rule}
+\author{Nobuo Otoi\\BA Cybersecurity, Tokyo, Japan\\\texttt{otoi@ba-cybersecurity.com}}
+\date{October 2026 (version 1)}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+draft-ietf-core-href-30 defines Constrained Resource Identifiers (CRIs), a CBOR form of URIs, with a
+procedure that resolves a CRI \emph{reference} against a base CRI (Section~5.3) and a procedure that
+converts a CRI reference to a URI reference (Section~6.1), which the draft calls the equivalent URI
+reference. For a base and a reference we compare two computations: the URI of the Section~5.3 result, and
+the RFC~3986 resolution of the converted reference against the base. We give three inputs on which the two
+differ, with every step written out. (A)~Resolving \cri{["t", null, ["p"]]} (the CRI for \uri{t:/p})
+against \cri{s://h} yields \cri{t://h/p} by Section~5.3, whereas Section~2.1 assigns no authority to the
+equivalent URI reference and RFC~3986 gives a reference with a scheme its own authority; the same input,
+used as a reference to itself, also fails the draft's requirement that resolution yield the original CRI.
+(B)~The reference \cri{[1]}, which removes the last path segment of the base, is converted to the empty
+URI reference, which denotes the base itself. (C)~The reference \cri{[1, ["", "a"]]} is converted to
+\uri{/a}, an absolute path, whereas Section~5.3 gives \uri{/b//a} for the base path \uri{/b/c}. We propose
+one sentence of correction for each. On an enumeration of 720{,}120 base--reference pairs with an
+authority, the two computations differ on 93{,}810; after the corrections they differ on none of the
+713{,}660 pairs that remain convertible (the corrections refuse 10{,}540 pairs and admit 4{,}080 that
+the draft's syntax check rejects). In Lean~4 (core library; axioms \lean{propext} and \lean{Quot.sound}
+only; no \lean{sorry}) the counterexamples are checked by kernel evaluation, and the corrected conversion
+of a discard-form reference, resolved per RFC~3986, is proved equal to the Section~5.3 resolution for
+every base with an authority and paths of any length. We make no claim about bases without an authority.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+
+A CRI~\cite{href} carries the five components of a URI~\cite{rfc3986} as a CBOR~\cite{rfc8949} array.
+A \emph{CRI reference} is the compact form for relative links: instead of the leading dot segments and
+slash of a URI reference, it carries a \emph{discard} value that says how many trailing segments of the
+base path to remove. Two procedures on references are normative. Section~5.3 resolves a reference
+against a base CRI (``An application MUST implement this operation by applying the algorithm specified
+in Section~5.3 (or any algorithm that is functionally equivalent to it)'', Section~5), and Section~6.1
+converts a CRI reference to a URI reference (``Applications MUST convert a CRI reference to a URI
+reference by determining the components \ldots{} according to the following steps''). The draft
+tabulates the correspondence between discard values and URI references (its Table~1:
+\cri{[1, ["a"]]} is \uri{a}, \cri{[2, ["a"]]} is \uri{../a}, \cri{[true, ["a"]]} is \uri{/a}).
+
+This note compares, for a base and a reference, the URI of the Section~5.3 result with the RFC~3986
+resolution of the Section~6.1 conversion against the base (Section~\ref{sec:cex} defines the comparison),
+and reports three inputs on which the two differ. Each is a finite computation that the reader can
+redo from the quoted text in a few minutes (Section~\ref{sec:cex}). We propose a one-sentence
+correction for each (Section~\ref{sec:fix}) and support the corrections in two ways
+(Section~\ref{sec:checks}): an exhaustive enumeration of small inputs, and a Lean~4 proof that the
+corrected conversion agrees with RFC~3986 resolution for all path lengths. Section~\ref{sec:scope}
+states exactly what is and is not claimed.
+
+\section{The text under test}
+\label{sec:bg}
+
+\paragraph{RFC 3986.} Section~5.2.2 resolves a reference $R$ against a base $B$ (which has no fragment,
+Section~5.1). If $R$ has a scheme, the target is $R$ with dot segments removed and in particular has
+$R$'s authority (possibly none). Otherwise the scheme is $B$'s; if $R$ has an authority, authority and path
+are $R$'s; otherwise the authority is $B$'s and the path is $B$'s path when $R$'s path is empty,
+$\rds(R.\mathit{path})$ when it starts with ``/'', and $\rds(\mergef(B,R))$ otherwise, where $\mergef$
+appends $R$'s path to $B$'s path with its last segment removed (or to ``/'' when $B$ has an authority
+and an empty path). The query is $R$'s, except that an empty-path reference without a query keeps $B$'s
+query; the fragment is $R$'s.
+
+\paragraph{Notation.} We write a path as a list of segments $p=\seq{p_1,\dots,p_k}$, $|p|=k$, with
+concatenation $p\mathbin{+\!\!+}q$, $\take{j}(p)=\seq{p_1,\dots,p_{\min(j,k)}}$ and
+$\dl(p)=\take{k-1}(p)$; $\e$ is the empty segment. For a base $B$ with an authority and path $p_B$,
+Sections~5.2.3 and~5.2.4 of RFC~3986 become, on segment lists,
+\begin{align*}
+\mergef_B(p) &= \begin{cases} p & \text{if } p_B=\seq{}\\ \dl(p_B)\mathbin{+\!\!+}p & \text{otherwise,}\end{cases}
+\qquad\qquad \rds(p)=R(\seq{},p),\\
+R(o,\seq{}) &= o,\\
+R(o,\text{``.''}::t) &= \begin{cases} o\mathbin{+\!\!+}\seq{\e} & t=\seq{}\\ R(o,t) & t\neq\seq{},\end{cases}\\
+R(o,\text{``..''}::t) &= \begin{cases} \dl(o)\mathbin{+\!\!+}\seq{\e} & t=\seq{}\\ R(\dl(o),t) & t\neq\seq{},\end{cases}\\
+R(o,s::t) &= R(o\mathbin{+\!\!+}\seq{s},t)\quad\text{for any other segment } s.
+\end{align*}
+A URI reference without scheme or authority is $u=(\mathit{rooted},p,q,f)$ with $p$ a segment list or
+$\bot$ (the empty path) and $q,f$ possibly $\bot$. Section~5.2.2 then reads
+\[
+\rfc(B,u).\mathit{path}=\begin{cases} p_B & p=\bot\\ \rds(p) & \mathit{rooted}\\ \rds(\mergef_B(p)) & \text{otherwise,}\end{cases}
+\qquad
+\rfc(B,u).\mathit{query}=\begin{cases} q & q\neq\bot\\ q_B & q=\bot,\ p=\bot\\ \seq{} & q=\bot,\ p\neq\bot,\end{cases}
+\]
+and the fragment is $f$. (The string form of a rooted $p$ is ``/''$p_1$``/''$\cdots p_k$; of an
+unrooted one, $p_1$``/''$\cdots p_k$; $\bot$ is the empty string.) These definitions are the ones
+formalized in Lean (Section~\ref{sec:checks}); their agreement with the string algorithms of RFC~3986
+is checked in Section~\ref{sec:checks}.
+
+\paragraph{The CRI data model.} A CRI reference (Figure~2 of~\cite{href}, in CDDL~\cite{rfc8610}) is an
+array whose head is either a scheme and an authority or a discard value, followed by path, query and
+fragment. The authority is a host, or one of two ``no authority'' values: null for a root-based path
+(\uri{a:/p}) and true for a rootless path (\uri{a:p}). Table~2 of Section~5.1 gives null as the default
+value of the authority section. Section~2.1 says of references:
+\begin{quote}\small
+(For example, for a CRI reference where authority is either not set or has either of the NOAUTHORITY
+values, the equivalent URI reference's authority is absent.)
+\end{quote}
+Path segments are never ``.'' or ``..'' (constraint C9).
+
+\paragraph{Section 5.3 (resolution).} Steps~3 and~5 read:
+\begin{quote}\small
+3. If the value of discard is true in the CRI reference (which is implicitly the case when scheme
+and/or authority are present in the reference), replace the path in the buffer with the empty array,
+set query to empty and fragment to null, and set a true authority to null. If the value of discard is
+an unsigned integer, remove as many elements from the end of the path array; if it is non-zero, set
+query to empty and fragment to null. Set discard to true in the buffer.\\[2pt]
+5. If query is non-null in the CRI reference, set fragment to null in the buffer. Apart from the
+path and discard, copy all non-null sections from the CRI reference to the buffer in sequence.
+\end{quote}
+Step~4 reads: ``If the path section is non-null in the CRI reference, append all elements from the path
+array to the array in the path section in the buffer; set query to empty and fragment to null.''
+For a reference in discard form $r=(d,\pi,\kappa,\varphi)$ ($d\in\{\mathit{true}\}\cup\mathbb{N}$;
+$\pi$ a segment list or $\bot$; $\kappa$ a query or $\bot$; $\varphi$ a fragment or $\bot$) and a base
+$B$ with path $p_B$ and query $q_B$, steps~3--5 compute
+\begin{align*}
+P_3&=\begin{cases}\seq{} & d=\mathit{true}\\ \take{|p_B|-n}(p_B) & d=n,\end{cases}
+&Q_3&=\begin{cases} q_B & d=0\\ \seq{} & \text{otherwise,}\end{cases}\\
+\res(B,r).\mathit{path}&=\begin{cases} P_3\mathbin{+\!\!+}\pi & \pi\neq\bot\\ P_3 & \pi=\bot,\end{cases}
+&\res(B,r).\mathit{query}&=\begin{cases} \kappa & \kappa\neq\bot\\ \seq{} & \kappa=\bot,\ \pi\neq\bot\\ Q_3 & \kappa=\bot,\ \pi=\bot,\end{cases}
+\end{align*}
+and $\res(B,r).\mathit{fragment}=\varphi$.
+
+\paragraph{Section 6.1 (conversion).} The path rule reads, in part:
+\begin{quote}\small
+If the CRI reference contains a discard item of value true, the path component is considered rooted.
+If it contains a discard item of value 0 and the path item is present, the conversion fails. If it
+contains a positive discard item, the path component is considered unrooted and prefixed by as many
+``../'' components as the discard value minus one indicates. If the discard value is 1 and the first
+element of the path contains a :, the path component is prefixed by ``./''. \ldots{} If the CRI
+reference contains one or more path items, the path component is constructed by concatenating the
+sequence of representations of these items. These representations generally contain a leading slash
+(``/'') character and the value of each item, processed as discussed below. The leading slash character
+is omitted for the first path item only if the path component is considered ``unrooted''.
+\end{quote}
+The rule ends with syntax checks: when neither authority nor scheme is present, the path component must
+match path-absolute, path-noscheme or path-empty of RFC~3986, else the conversion fails.
+In the notation above, with $\mathit{items}=\pi$ (or $\seq{}$ if $\pi=\bot$), the path part of
+$\conv(r)$ is
+\begin{align*}
+d=\mathit{true}&:\ (\mathit{rooted},\ \mathit{items});\\
+d=0&:\ \text{fail if }\pi\neq\bot,\ \text{else the empty path};\\
+d=n\ge1&:\ (\mathit{unrooted},\ \mathit{pre}\mathbin{+\!\!+}\mathit{items}),\qquad
+\mathit{pre}=\begin{cases}\seq{\text{``.''}} & n=1 \text{ and ``:''}\in\mathit{items}_1\\ \seq{\text{``..''}}^{\,n-1} & n\ge2\\ \seq{} & \text{otherwise,}\end{cases}
+\end{align*}
+followed by the string rendering, and the query part is $\kappa$ if $\kappa\neq\bot$ and
+$\kappa\neq\seq{}$, else $\bot$.
+Section~2.3 states that some well-formed references cannot be converted, naming \cri{[0, ["p"]]} and
+\cri{[0, null, []]}.
+
+\section{Three counterexamples}
+\label{sec:cex}
+
+For a base $B$ and a reference $r$ we compute two things: $u_1$, the URI of the Section~5.3 result
+(Section~6.1 applied to the resolved full CRI); and $u_2$, the RFC~3986 resolution, against the URI of
+$B$, of the URI reference that Section~6.1 produces from $r$---the reference that the draft calls the
+equivalent URI reference (Section~2.1, Table~1). We say that $B$ and $r$ \emph{disagree} when
+$u_1\neq u_2$:
+\[
+u_1(B,r)=\conv(\res(B,r)),\qquad u_2(B,r)=\rfc\bigl(\conv(B),\conv(r)\bigr).
+\] This describes two computations; it does not presuppose that the draft promises their
+agreement. In each case below we write the base and the reference, apply Section~5.3 step by step, apply
+Section~6.1 step by step, and apply RFC~3986 to the converted reference. Table~\ref{tab:cex} summarizes.
+
+\begin{table}[ht]
+\centering\small
+\begin{tabular}{lllllll}
+\toprule
+ & base & CRI reference & Section 5.3 gives & Section 6.1 gives & RFC 3986 gives\\
+\midrule
+A & \cri{s://h} & \cri{["t", null, ["p"]]} & \cri{t://h/p} & \uri{t:/p} & \uri{t:/p}\\
+B & \cri{s://h/} & \cri{[1]} & \cri{s://h} & \uri{""} & \uri{s://h/}\\
+B & \cri{s://h/a/} & \cri{[2, []]} & \cri{s://h} & \uri{../} & \uri{s://h/}\\
+C & \cri{s://h/b/c} & \cri{[1, ["", "a"]]} & \cri{s://h/b//a} & \uri{/a} & \uri{s://h/a}\\
+B$'$ & \cri{s://h?q} & \cri{[0, null, []]} & \cri{s://h} & \uri{""} & \uri{s://h?q}\\
+\bottomrule
+\end{tabular}
+\caption{The counterexamples. ``Section 5.3 gives'' is the resolved CRI, written as a URI; ``Section 6.1 gives'' is the
+URI reference obtained from the CRI reference; ``RFC 3986 gives'' is that URI reference resolved against the base.}
+\label{tab:cex}
+\end{table}
+
+\subsection{A: a null authority is not copied}
+Base \cri{["s", ["h"]]} (\uri{s://h}); reference \cri{["t", null, ["p"]]}, the CRI for \uri{t:/p}
+(scheme \cri{t}, authority null = NOAUTH-ROOTBASED of Figure~2, path \cri{["p"]}).
+\begin{itemize}[nosep]
+\item Step~3: a scheme is present, so discard is implicitly true. The buffer's path becomes \cri{[]},
+query empty, fragment null. The buffer's authority is \cri{["h"]}, not true, so it is unchanged.
+\item Step~4: the path \cri{["p"]} is appended: buffer path \cri{["p"]}.
+\item Step~5: the non-null sections of the reference are the scheme \cri{t} and the path. The authority
+is null and is not copied. Result: \cri{["t", ["h"], ["p"]]}, i.e.\ \uri{t://h/p}.
+\end{itemize}
+In symbols, with $B=(\mathit{s},\seq{h},\seq{},\seq{})$ and $r=(\mathit{t},\mathit{null},\seq{p})$:
+\[
+\res(B,r)=(\mathit{t},\seq{h},\seq{p}),\qquad\text{RFC 3986 for a reference with a scheme: } T=R=(\mathit{t},\bot,\seq{p}).
+\]
+Section~2.1 assigns no authority to the equivalent URI reference of a reference whose authority is null
+(or not set), and RFC~3986 Section~5.2.2 gives a reference with a scheme its own authority: \uri{t:/p}.
+The Section~5.3 result differs from both. The outcome does not depend on how null is read (a value, as
+the CDDL has it, or ``not set''), since Section~2.1 covers both; nor on whether ``a true authority'' in
+step~3 refers to the buffer's or the reference's authority, since neither is true.
+
+A second check stays inside the draft. Section~5 says that ``the only requirement on a CRI reference is
+that reference resolution MUST yield the original CRI'', and Figure~2 admits a reference with a scheme and
+a null authority, so a CRI may be written as a reference to itself. Applying steps~3--5 to the CRI
+\uri{t:/p}, used as a reference against the base \uri{s://h}, yields \uri{t://h/p}, not the original;
+the rootless \uri{t:p} (authority true), by contrast, is returned unchanged, because step~5 copies true.
+
+\subsection{B: a discard value without path items}
+Base \cri{["s", ["h"], [""]]} (\uri{s://h/}); reference \cri{[1]}.
+\begin{itemize}[nosep]
+\item Section~5.3: discard~1 removes the last element of the path, \cri{[""]} becomes \cri{[]}; query
+empty, fragment null; nothing to append or copy. Result \cri{["s", ["h"], []]}, i.e.\ \uri{s://h}.
+\item Section~6.1: discard is positive, so the path is unrooted and prefixed by $1-1=0$ copies of
+\uri{../}. The rule then defines the path component only ``if the CRI reference contains one or more
+path items''; here there are none. Read as an empty path component (the reading of our model), the URI
+reference is \uri{""}. Read as undefined, Section~6.1 produces nothing and, unlike the case of discard~0
+with a path, does not say that the conversion fails.
+\item RFC~3986, under the first reading: the empty reference has an empty path, so the target path is the
+base path: \uri{s://h/}.
+\end{itemize}
+In symbols, with $p_B=\seq{\e}$ and $r=(1,\bot,\bot,\bot)$:
+\begin{gather*}
+\res(B,r).\mathit{path}=\take{0}(\seq{\e})=\seq{},\qquad
+\conv(r)=(\mathit{unrooted},\seq{})\ \text{rendered as }\bot,\\
+\rfc(B,\conv(r)).\mathit{path}=p_B=\seq{\e}.
+\end{gather*}
+Under either reading the failure clause of correction~(B) is missing. The same happens for \cri{[1, []]}
+and \cri{[true]} (converted to \uri{""}), and for \cri{[2, []]} against \uri{s://h/a/}: Section~5.3
+removes both segments and gives \uri{s://h}, Section~6.1 gives \uri{../}, and RFC~3986 resolves
+\uri{../} against \uri{s://h/a/} to \uri{s://h/}:
+\begin{align*}
+\res(B,r).\mathit{path}&=\take{0}(\seq{a,\e})\mathbin{+\!\!+}\seq{}=\seq{},\\
+\rds(\mergef_B(\seq{\text{``..''}}))&=R(\seq{},\seq{a,\text{``..''}})=R(\seq{a},\seq{\text{``..''}})\\
+&=\dl(\seq{a})\mathbin{+\!\!+}\seq{\e}=\seq{\e}.
+\end{align*}
+A relative-path reference cannot have the meaning of \cri{[1]} for all bases:
+\begin{lemma}
+For every base $B$ with an authority and every non-empty segment list $p$,
+$\mathrm{last}\bigl(\rds(\mergef_B(p))\bigr)=\e$ if $\mathrm{last}(p)\in\{\e,\text{``.''},\text{``..''}\}$ and
+$=\mathrm{last}(p)$ otherwise; and $\rfc(B,(\cdot,\bot,\bot,\bot)).\mathit{path}=p_B$.
+\end{lemma}
+\noindent (In $R$, the last segment of the input is the last one appended, or $\e$ in the three
+special cases; nothing after it is removed.) The last segment of the target therefore does not depend
+on $B$, while a reference meaning ``remove the last segment'' would have to end in $B$'s second-to-last
+segment. Section~2.3 states that some references
+cannot be converted, and Section~6.1 fails for \cri{[0, ["p"]]}; it does not fail for these.
+
+The reference \cri{[0, null, []]} (B$'$ in Table~\ref{tab:cex}; ``leave the path, remove the query''),
+which Section~2.3 lists among the references that cannot be converted, is likewise converted to
+\uri{""}, which keeps the base's query under RFC~3986.
+
+\subsection{C: an empty first segment}
+Base \cri{["s", ["h"], ["b", "c"]]} (\uri{s://h/b/c}); reference \cri{[1, ["", "a"]]}.
+\begin{itemize}[nosep]
+\item Section~5.3: discard~1 removes \cri{"c"}; the items \cri{""} and \cri{"a"} are appended. Result
+\cri{["s", ["h"], ["b", "", "a"]]}, i.e.\ \uri{s://h/b//a}.
+\item Section~6.1: discard~1, unrooted, no \uri{../} prefix; the first element does not contain a colon,
+so no \uri{./} prefix. The first item \cri{""} is written without a leading slash, the second as
+\uri{/a}: the path component is \uri{""}\,+\,\uri{/a} = \uri{/a}. It matches path-absolute, so the
+conversion succeeds with the URI reference \uri{/a}.
+\item RFC~3986: a reference whose path starts with ``/'' replaces the base path: \uri{s://h/a}.
+\end{itemize}
+In symbols, with $p_B=\seq{b,c}$ and $r=(1,\seq{\e,a},\bot,\bot)$:
+\begin{gather*}
+\res(B,r).\mathit{path}=\take{1}(\seq{b,c})\mathbin{+\!\!+}\seq{\e,a}=\seq{b,\e,a},\\
+\conv(r)=(\mathit{unrooted},\seq{\e,a})\ \text{rendered as }(\mathit{rooted},\seq{a}),\qquad
+\rfc(B,\conv(r)).\mathit{path}=\rds(\seq{a})=\seq{a}.
+\end{gather*}
+With correction~(C), $\conv(r)=(\mathit{unrooted},\seq{\text{``.''},\e,a})$ and
+\[
+\rds(\mergef_B(\seq{\text{``.''},\e,a}))=R(\seq{},\seq{b,\text{``.''},\e,a})=R(\seq{b},\seq{\text{``.''},\e,a})=R(\seq{b},\seq{\e,a})=\seq{b,\e,a}.
+\]
+A URI reference with the meaning of the CRI reference is \uri{.//a}: RFC~3986 merges it to
+\uri{/b/.//a} and $\rds$ gives \uri{/b//a}. The \uri{./} prefix that Section~6.1 prescribes for a first
+segment containing a colon (so that it is not read as a scheme) is also needed for an empty first segment
+(so that it is not read as a leading slash). The subcase \cri{[1, [""]]}, meaning \uri{./}, is converted
+to \uri{""}.
+
+\section{Corrections}
+\label{sec:fix}
+
+\begin{enumerate}[label=\textbf{(\Alph*)},leftmargin=*]
+\item Section~5.3, step~3 or step~5: ``If the CRI reference has a scheme, replace the authority in the
+buffer with the authority of the CRI reference (which may be null or true).'' Equivalently, as in
+RFC~3986 Section~5.2.2: ``If the CRI reference has a scheme, the result is the CRI reference itself and
+steps~3--5 are skipped.''
+\item Section~6.1, path rule: ``If the CRI reference contains a discard item (true or a positive
+integer) and no path items, the conversion fails.'' And, for the case of Section~2.3: ``If it contains a
+discard item of value~0, no path item, and a query item that is an empty array, the conversion fails.''
+\item Section~6.1, path rule: ``If the discard value is~1 and the first element of the path is the empty
+string or contains a :, the path component is prefixed by `./'.''
+\end{enumerate}
+
+\section{Checks}
+\label{sec:checks}
+
+\subsection{Exhaustive enumeration}
+We implemented RFC~3986 Section~5.2 literally on strings (\lean{model/rfc3986.py}); it reproduces the
+42 examples of Section~5.4. We implemented Sections~5.3 and~6.1 of~\cite{href} as written
+(\lean{model/cri.py}), with the corrections (A)--(C) behind a flag. For every base CRI with a host
+authority and every CRI reference in an enumeration (path segments from \cri{"a"}, \cri{"b"}, the empty
+string and \cri{"x:y"}; base paths of up to three segments; references with discard~0--4 or true, or
+with a scheme or an authority; queries and fragments present or absent), we compared the URI of the
+Section~5.3 result with the RFC~3986 resolution of the Section~6.1 conversion, on the pairs that
+Section~6.1 converts (\lean{model/check.py}). Where a discard value exceeds the number of base path
+segments, we read ``remove as many elements'' as stopping at the empty array (the text does not say).
+With $\mathcal{B}$ the 170 bases and $\mathcal{R}$ the 4{,}890 references, let
+$\mathcal{C}=\{(B,r)\in\mathcal{B}\times\mathcal{R}:\conv(r)\text{ defined}\}$ and
+$\mathcal{D}=\{(B,r)\in\mathcal{C}:u_1(B,r)\neq u_2(B,r)\}$; the corrected versions are
+$\mathcal{C}'$ and $\mathcal{D}'$. Then $|\mathcal{B}\times\mathcal{R}|=831{,}300$,
+$|\mathcal{C}|=720{,}120$, $|\mathcal{D}|=93{,}810$, $|\mathcal{C}'|=713{,}660$ and $|\mathcal{D}'|=0$,
+with the classification of $\mathcal{D}$ by the shape of the reference (B comprises the ten classes
+discard 1--4 or true with the path absent or \cri{[]}):
+
+\begin{center}\small
+\begin{tabular}{llrr}
+\toprule
+ & & draft -30 & corrected\\
+\midrule
+\multicolumn{2}{l}{comparable pairs} & 720{,}120 & 713{,}660\\
+A & scheme present, authority null & 66{,}300 & 0\\
+B & positive or true discard, no path items & 10{,}168 & 0\\
+B$'$ & discard 0, no path, query \cri{[]} & 170 & 0\\
+C & discard 1, first segment empty & 17{,}172 & 0\\
+\multicolumn{2}{l}{total disagreements} & 93{,}810 & 0\\
+\bottomrule
+\end{tabular}
+\end{center}
+\noindent Every disagreement is of one of the three shapes, and none remains after the corrections.
+The number of comparable pairs changes because correction~(B) refuses 10{,}540 of the 720{,}120 pairs,
+while the corrected rule~(C) admits 4{,}080 pairs of the shape \cri{[1, ["", "", \ldots]]} (converted
+to \uri{.//\ldots}) that the draft's syntax check rejects (\uri{//\ldots}). A smaller enumeration (paths of up to two segments, discard up to~3; 40{,}320 comparable pairs, 7{,}530
+disagreements) gives the same picture.
+
+\subsection{Lean 4}
+\lean{lean/Cri.lean} (Lean~4.33.1~\cite{lean4}, core library only, 328 lines) models paths as lists of
+segments, where a segment is abstracted to what the procedures inspect: \lean{Seg = dot | dotdot | empty
+| other id colon} (an identifier and whether the segment contains a colon). \lean{resolveCRI} is
+steps~3--5 of Section~5.3 for references in discard form; \lean{convDraft} is the Section~6.1 path rule
+under the empty-path reading of Section~\ref{sec:cex}, followed by the collapse that the string form
+imposes on an unrooted path whose first segment is empty (\uri{""}\,+\,\uri{/a} is \uri{/a}, \uri{""}
+alone is the empty path); it omits the final path-syntax check of Section~6.1, which none of the four
+counterexamples triggers (the theorem concerns \lean{convFixed}). \lean{convFixed}
+applies (B) and (C); \lean{rds}, \lean{merge} and \lean{resolve3986} are RFC~3986 Sections~5.2.2--5.2.4
+for a base with an authority and a reference without scheme or authority.
+
+\paragraph{Counterexamples by kernel evaluation.} Four theorems each state that \lean{convDraft}
+yields the URI reference of Table~\ref{tab:cex} and that its RFC~3986 resolution differs from
+\lean{resolveCRI}:
+\begin{itemize}[nosep]
+\item \lean{cex\_discard\_without\_path}: \cri{[1]} against \uri{s://h/} (B);
+\item \lean{cex\_discard\_two\_without\_path}: \cri{[2, []]} against \uri{s://h/a/} (B);
+\item \lean{cex\_leading\_empty\_segment}: \cri{[1, ["", "a"]]} against \uri{s://h/b/c} (C);
+\item \lean{cex\_discard\_zero\_empty\_query}: \cri{[0, null, []]} against \uri{s://h?q} (B$'$).
+\end{itemize}
+All are proved by \lean{decide} and depend on \lean{propext} only.
+Finding~A concerns the authority, which the path model abstracts away; \lean{authDraft} models steps~3
+and~5 on the three authority values, and \lean{cex\_null\_authority} states
+\lean{authDraft (host 0) rootbased = host 0} with no axioms.
+
+\begin{theorem}[\lean{convFixed\_sound}]
+Let $B$ be a base with an authority whose path contains no dot segments, and $r=(d,\pi,\kappa,\varphi)$ a
+CRI reference in discard form with $\pi$ free of dot segments. Then
+\[
+\conv'(r)=u\ \Longrightarrow\ \rfc(B,u)=\res(B,r),
+\]
+where $\conv'$ is the conversion with corrections (B) and (C) (\lean{convFixed}).
+\end{theorem}
+\begin{proof}[Proof sketch]
+By cases on the discard value. For true, the reference has a non-empty path $p$ and $\rds(p)=p$. For~0,
+the reference has no path and its query is not \cri{[]}; both sides keep the base path and take the
+reference's query if present, else the base's. For $k+1$, the reference has a non-empty path $s{::}t$ and
+the converted path is $\mathit{pre}\mathbin{+\!\!+}(s{::}t)$ with $\mathit{pre}$ empty or $[\text{``.''}]$
+for $k=0$ and $k$ copies of ``..'' otherwise. The lemmas \lean{rdsAux\_dotdots} and \lean{rdsAux\_dot} give, for non-empty dot-free
+$\mathit{items}$ and any $o$,
+\begin{gather*}
+R\bigl(o,\ \seq{\text{``..''}}^{k}\mathbin{+\!\!+}\mathit{items}\bigr)=\take{|o|-k}(o)\mathbin{+\!\!+}\mathit{items},\qquad
+R\bigl(o,\ \text{``.''}::\mathit{items}\bigr)=o\mathbin{+\!\!+}\mathit{items}
+\end{gather*}
+(the first by induction on $k$, using $\dl(o)=\take{|o|-1}(o)$).
+Since $\mergef_B$ removes one more segment,
+\[
+\rds\bigl(\mergef_B(\mathit{pre}\mathbin{+\!\!+}(s{::}t))\bigr)=\take{|p_B|-(k+1)}(p_B)\mathbin{+\!\!+}(s{::}t)=P_3\mathbin{+\!\!+}\pi ,
+\]
+which is step~3 followed by step~4 (the case $p_B=\seq{}$, where $\mergef_B$ is the identity and
+$\take{|p_B|-(k+1)}$ is empty, is immediate). Query and fragment agree by inspection of the two
+definitions.
+\end{proof}
+\noindent The theorem depends on \lean{propext} and \lean{Quot.sound}; \lean{Classical.choice} is not
+used and the file contains no \lean{sorry}. \lean{lean Cri.lean} prints only the six
+\lean{\#print axioms} lines. The theorem covers references in discard form; correction~(A) concerns the
+authority, which this model abstracts away, and rests on the enumeration.
+
+\paragraph{Relation between the two checks.} The segment-level rendering of RFC~3986 in Lean was
+compared with the literal string implementation on all 1{,}364 rooted paths of one to five segments over
+\{\cri{a}, empty, \cri{.}, \cri{..}\} and on all 21{,}420 (draft) and 19{,}320 (corrected) convertible
+pairs of a host base and a discard-form reference of the smaller enumeration, with no difference
+(\lean{model/seglevel.py}); \lean{lean/CrossCheck.lean} re-checks by \lean{decide} the results that the
+Python model computed for 60 random pairs.
+
+\section{A remark on host names}
+\label{sec:ipv4}
+Section~3 of~\cite{href} states the objective that two distinct normalized CRIs do not convert to the
+same URI. Constraint~C5 allows the host name \cri{["1","2","1","2"]}, which converts to \uri{1.2.1.2},
+as does the IP-address host \cri{h'01020102'}; RFC~3986 Section~3.2.2 says that a host matching
+IPv4address is an IPv4 address literal, and Section~8.1.2 of~\cite{href} maps such a Uri-Host to
+host-ip. A sentence in C5 (``A registered name that matches the IPv4address rule MUST be represented as
+host-ip'') would make the data model say the same.
+
+\section{Scope}
+\label{sec:scope}
+We claim exactly the following. (1)~On the inputs of Table~\ref{tab:cex}, Sections~5.3 and~6.1 of
+draft-ietf-core-href-30, applied as written, give the results shown, which differ from the authority that
+Section~2.1 and RFC~3986 give (A) or from the RFC~3986 meaning of the converted reference (B, C, B$'$).
+(2)~With corrections (A)--(C), no such disagreement exists on the enumeration of
+Section~\ref{sec:checks}, and the Lean theorem extends (B) and (C) to all path lengths for bases with an
+authority and discard-form references, at the segment level.
+We do not claim anything about base CRIs without an authority (there RFC~3986's own $\rds$ turns
+rootless paths into rooted ones, so we leave them aside), about the
+practical frequency of the shapes involved, or about consequences beyond the plain fact that a
+converted reference denotes a different URI than the CRI reference. The segment-level model is related
+to the string procedures by testing, not by proof. The reference shape \cri{[null, true, path]} was
+excluded from the enumeration.
+
+In the 144 closed issues and pull requests of \lean{core-wg/href} and the messages of the \lean{core}
+mailing list that we examined (listed in \lean{prior\_art.md}) (2020 onwards, about 90 matching \emph{href}, \emph{CRI},
+\emph{remove\_dot\_segments}, \emph{rootless} or \emph{discard}; twelve read in full), none of A, B or C
+is discussed; issue~\#48 introduced the \uri{./} prefix for a leading colon, and issue~\#30 found the
+wording of step~5 odd without drawing consequence~A.
+
+\section*{Artifacts}
+\lean{lean/Cri.lean}, \lean{lean/CrossCheck.lean} (Lean~4.33.1, core only) and \lean{model/}
+(Python~3: \lean{rfc3986.py}, \lean{cri.py}, \lean{check.py}, \lean{inject.py}, \lean{seglevel.py},
+\lean{gen\_crosscheck.py}, with their outputs, produced by re-running the scripts in the archive), and
+\lean{prior\_art.md} (the issues and messages examined). Checked against the text of
+draft-ietf-core-href-30 (21 November 2025). Repository and archive: to be published with this note.
+
+\section*{Acknowledgements}
+An AI agent, applying a target-selection method set by the author, chose this draft and produced the
+proofs, code and text. The author restricted the claims to those with self-evident evidence, directed
+two rounds of revision, and checked and approved the results.
+
+\begin{thebibliography}{9}\small
+\bibitem{href} C.~Bormann (Ed.) and H.~Birkholz, ``Constrained Resource Identifiers,''
+  Internet-Draft draft-ietf-core-href-30, IETF, 21 November 2025; in the RFC Editor queue as of
+  October 2026.
+\bibitem{rfc3986} T.~Berners-Lee, R.~Fielding, and L.~Masinter, ``Uniform Resource Identifier (URI):
+  Generic Syntax,'' STD~66, RFC~3986, January 2005.
+\bibitem{rfc8949} C.~Bormann and P.~Hoffman, ``Concise Binary Object Representation (CBOR),'' STD~94,
+  RFC~8949, December 2020.
+\bibitem{rfc8610} H.~Birkholz, C.~Vigano, and C.~Bormann, ``Concise Data Definition Language (CDDL),''
+  RFC~8610, June 2019.
+\bibitem{lean4} L.~de~Moura and S.~Ullrich, ``The Lean 4 Theorem Prover and Programming Language,''
+  in \emph{CADE 28}, LNCS 12699, Springer, 2021.
+\end{thebibliography}
+
+\end{document}

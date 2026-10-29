@@ -1,0 +1,159 @@
+DRAFT-30: pairs 117660, reference not convertible 15900, compared 101760, mismatches 20766 (resolution gave invalid CRI in 4644)
+   4284  base=host | ref scheme=yes authority=null
+         base ["s", ["h"], [], []] = s://h ; ref ["t", null, []] -> URI ref "t:"
+         CRI resolution: t://h   RFC 3986: t:
+   2160  base=rootless | discard=2 path=nonempty
+         base ["s", true, ["a", ""], []] = s:a/ ; ref [2, ["a"]] -> URI ref "../a"
+         CRI resolution: s:a   RFC 3986: s:/a
+   2160  base=rootless | discard=3 path=nonempty
+         base ["s", true, ["a", ""], []] = s:a/ ; ref [3, ["a"]] -> URI ref "../../a"
+         CRI resolution: s:a   RFC 3986: s:/a
+   1220  base=host | discard=1 path=lead-empty
+         base ["s", ["h"], [], []] = s://h ; ref [1, [""]] -> URI ref ""
+         CRI resolution: s://h/   RFC 3986: s://h
+    988  base=rootbased | discard=1 path=lead-empty
+         base ["s", null, [], []] = s: ; ref [1, [""]] -> URI ref ""
+         CRI resolution: s:/   RFC 3986: s:
+    900  base=rootless | discard=2 path=lead-empty
+         base ["s", true, ["a"], []] = s:a ; ref [2, [""]] -> URI ref "../"
+         CRI resolution: <invalid CRI ["s", true, [""], []]>   RFC 3986: s:
+    900  base=rootless | discard=3 path=lead-empty
+         base ["s", true, ["a"], []] = s:a ; ref [3, [""]] -> URI ref "../../"
+         CRI resolution: <invalid CRI ["s", true, [""], []]>   RFC 3986: s:
+    876  base=rootless | discard=1 path=lead-empty
+         base ["s", true, ["a"], []] = s:a ; ref [1, [""]] -> URI ref ""
+         CRI resolution: <invalid CRI ["s", true, [""], []]>   RFC 3986: s:a
+    828  base=rootbased | discard=2 path=lead-empty
+         base ["s", null, [], []] = s: ; ref [2, [""]] -> URI ref "../"
+         CRI resolution: s:/   RFC 3986: s:
+    828  base=rootbased | discard=3 path=lead-empty
+         base ["s", null, [], []] = s: ; ref [3, [""]] -> URI ref "../../"
+         CRI resolution: s:/   RFC 3986: s:
+    252  base=host | discard=2 path=none
+         base ["s", ["h"], [], []] = s://h ; ref [2] -> URI ref "../"
+         CRI resolution: s://h   RFC 3986: s://h/
+    252  base=host | discard=2 path=empty
+         base ["s", ["h"], [], []] = s://h ; ref [2, []] -> URI ref "../"
+         CRI resolution: s://h   RFC 3986: s://h/
+    252  base=host | discard=3 path=none
+         base ["s", ["h"], [], []] = s://h ; ref [3] -> URI ref "../../"
+         CRI resolution: s://h   RFC 3986: s://h/
+    252  base=host | discard=3 path=empty
+         base ["s", ["h"], [], []] = s://h ; ref [3, []] -> URI ref "../../"
+         CRI resolution: s://h   RFC 3986: s://h/
+    244  base=host | discard=1 path=none
+         base ["s", ["h"], [""], []] = s://h/ ; ref [1] -> URI ref ""
+         CRI resolution: s://h   RFC 3986: s://h/
+    244  base=host | discard=1 path=empty
+         base ["s", ["h"], [""], []] = s://h/ ; ref [1, []] -> URI ref ""
+         CRI resolution: s://h   RFC 3986: s://h/
+    244  base=host | discard=True path=none
+         base ["s", ["h"], [""], []] = s://h/ ; ref [true] -> URI ref ""
+         CRI resolution: s://h   RFC 3986: s://h/
+    244  base=host | discard=True path=empty
+         base ["s", ["h"], [""], []] = s://h/ ; ref [true, []] -> URI ref ""
+         CRI resolution: s://h   RFC 3986: s://h/
+    196  base=rootbased | discard=1 path=none
+         base ["s", null, [""], []] = s:/ ; ref [1] -> URI ref ""
+         CRI resolution: s:   RFC 3986: s:/
+    196  base=rootbased | discard=1 path=empty
+         base ["s", null, [""], []] = s:/ ; ref [1, []] -> URI ref ""
+         CRI resolution: s:   RFC 3986: s:/
+    196  base=rootbased | discard=True path=none
+         base ["s", null, [""], []] = s:/ ; ref [true] -> URI ref ""
+         CRI resolution: s:   RFC 3986: s:/
+    196  base=rootbased | discard=True path=empty
+         base ["s", null, [""], []] = s:/ ; ref [true, []] -> URI ref ""
+         CRI resolution: s:   RFC 3986: s:/
+    192  base=rootbased | discard=2 path=none
+         base ["s", null, [""], []] = s:/ ; ref [2] -> URI ref "../"
+         CRI resolution: s:   RFC 3986: s:/
+    192  base=rootbased | discard=2 path=empty
+         base ["s", null, [""], []] = s:/ ; ref [2, []] -> URI ref "../"
+         CRI resolution: s:   RFC 3986: s:/
+    192  base=rootbased | discard=3 path=none
+         base ["s", null, [""], []] = s:/ ; ref [3] -> URI ref "../../"
+         CRI resolution: s:   RFC 3986: s:/
+    192  base=rootbased | discard=3 path=empty
+         base ["s", null, [""], []] = s:/ ; ref [3, []] -> URI ref "../../"
+         CRI resolution: s:   RFC 3986: s:/
+    180  base=rootbased | discard=1 path=nonempty
+         base ["s", null, [], []] = s: ; ref [1, ["a"]] -> URI ref "a"
+         CRI resolution: s:/a   RFC 3986: s:a
+    180  base=rootbased | discard=2 path=nonempty
+         base ["s", null, [], []] = s: ; ref [2, ["a"]] -> URI ref "../a"
+         CRI resolution: s:/a   RFC 3986: s:a
+    180  base=rootbased | discard=3 path=nonempty
+         base ["s", null, [], []] = s: ; ref [3, ["a"]] -> URI ref "../../a"
+         CRI resolution: s:/a   RFC 3986: s:a
+    180  base=rootless | discard=1 path=none
+         base ["s", true, ["a"], []] = s:a ; ref [1] -> URI ref ""
+         CRI resolution: <invalid CRI ["s", true, [], []]>   RFC 3986: s:a
+    180  base=rootless | discard=1 path=empty
+         base ["s", true, ["a"], []] = s:a ; ref [1, []] -> URI ref ""
+         CRI resolution: <invalid CRI ["s", true, [], []]>   RFC 3986: s:a
+    180  base=rootless | discard=2 path=none
+         base ["s", true, ["a"], []] = s:a ; ref [2] -> URI ref "../"
+         CRI resolution: <invalid CRI ["s", true, [], []]>   RFC 3986: s:
+    180  base=rootless | discard=2 path=empty
+         base ["s", true, ["a"], []] = s:a ; ref [2, []] -> URI ref "../"
+         CRI resolution: <invalid CRI ["s", true, [], []]>   RFC 3986: s:
+    180  base=rootless | discard=3 path=none
+         base ["s", true, ["a"], []] = s:a ; ref [3] -> URI ref "../../"
+         CRI resolution: <invalid CRI ["s", true, [], []]>   RFC 3986: s:
+    180  base=rootless | discard=3 path=empty
+         base ["s", true, ["a"], []] = s:a ; ref [3, []] -> URI ref "../../"
+         CRI resolution: <invalid CRI ["s", true, [], []]>   RFC 3986: s:
+    180  base=rootless | discard=True path=none
+         base ["s", true, ["a"], []] = s:a ; ref [true] -> URI ref ""
+         CRI resolution: s:   RFC 3986: s:a
+    180  base=rootless | discard=True path=empty
+         base ["s", true, ["a"], []] = s:a ; ref [true, []] -> URI ref ""
+         CRI resolution: s:   RFC 3986: s:a
+     42  base=host | discard=0 path=none query=[]
+         base ["s", ["h"], [], ["q"]] = s://h?q ; ref [0, null, []] -> URI ref ""
+         CRI resolution: s://h   RFC 3986: s://h?q
+     34  base=rootbased | discard=0 path=none query=[]
+         base ["s", null, [], ["q"]] = s:?q ; ref [0, null, []] -> URI ref ""
+         CRI resolution: s:   RFC 3986: s:?q
+     30  base=rootless | discard=0 path=none query=[]
+         base ["s", true, ["a"], ["q"]] = s:a?q ; ref [0, null, []] -> URI ref ""
+         CRI resolution: s:a   RFC 3986: s:a?q
+
+FIXED: pairs 117660, reference not convertible 21200, compared 96460, mismatches 8460 (resolution gave invalid CRI in 3456)
+   3456  resolution fails (FIX C')
+         base ["s", null, [], []] = s: ; ref [1, ["", "a"]] -> URI ref ".//a"
+         CRI resolution: <fails>   RFC 3986: s:/a
+   2160  base=rootless | discard=2 path=nonempty
+         base ["s", true, ["a", ""], []] = s:a/ ; ref [2, ["a"]] -> URI ref "../a"
+         CRI resolution: s:a   RFC 3986: s:/a
+   2160  base=rootless | discard=3 path=nonempty
+         base ["s", true, ["a", ""], []] = s:a/ ; ref [3, ["a"]] -> URI ref "../../a"
+         CRI resolution: s:a   RFC 3986: s:/a
+    180  base=rootbased | discard=1 path=nonempty
+         base ["s", null, [], []] = s: ; ref [1, ["a"]] -> URI ref "a"
+         CRI resolution: s:/a   RFC 3986: s:a
+    180  base=rootbased | discard=2 path=nonempty
+         base ["s", null, [], []] = s: ; ref [2, ["a"]] -> URI ref "../a"
+         CRI resolution: s:/a   RFC 3986: s:a
+    180  base=rootbased | discard=3 path=nonempty
+         base ["s", null, [], []] = s: ; ref [3, ["a"]] -> URI ref "../../a"
+         CRI resolution: s:/a   RFC 3986: s:a
+     36  base=rootless | discard=1 path=lead-empty
+         base ["s", true, ["a"], []] = s:a ; ref [1, [""]] -> URI ref "./"
+         CRI resolution: s:/   RFC 3986: s:
+     36  base=rootless | discard=2 path=lead-empty
+         base ["s", true, ["a"], []] = s:a ; ref [2, [""]] -> URI ref "../"
+         CRI resolution: s:/   RFC 3986: s:
+     36  base=rootless | discard=3 path=lead-empty
+         base ["s", true, ["a"], []] = s:a ; ref [3, [""]] -> URI ref "../../"
+         CRI resolution: s:/   RFC 3986: s:
+     12  base=rootbased | discard=1 path=lead-empty
+         base ["s", null, [], []] = s: ; ref [1, [""]] -> URI ref "./"
+         CRI resolution: s:/   RFC 3986: s:
+     12  base=rootbased | discard=2 path=lead-empty
+         base ["s", null, [], []] = s: ; ref [2, [""]] -> URI ref "../"
+         CRI resolution: s:/   RFC 3986: s:
+     12  base=rootbased | discard=3 path=lead-empty
+         base ["s", null, [], []] = s: ; ref [3, [""]] -> URI ref "../../"
+         CRI resolution: s:/   RFC 3986: s:

@@ -1,0 +1,7 @@
+bases: {'host': 42, 'noauth': 64} | references: {'discard form': 660, 'scheme/authority form, scheme absent': 132, 'scheme/authority form, scheme present': 318} | total refs 1110
+DRAFT-30: comparable {'host': 40320, 'noauth': 61440}
+   host: total 7530 | A=4284 B=1984 B'=42 C=1220
+   noauth: total 13236 | B=2200 B'=64 C=1444 D=4884 invalid CRI result=4644
+CORRECTED: comparable {'host': 38220, 'noauth': 58240}
+   host: total 0 | 
+   noauth: total 8460 | C=48 D=4956 resolution fails=3456

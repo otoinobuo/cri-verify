@@ -1,0 +1,42 @@
+DRAFT-30: pairs 831300, reference not convertible 111180, compared 720120, mismatches 93810 (resolution gave invalid CRI in 0)
+  66300  base=host | ref scheme=yes authority=null
+         base ["s", ["h"], [], []] = s://h ; ref ["t", null, []] -> URI ref "t:"
+         CRI resolution: t://h   RFC 3986: t:
+  17172  base=host | discard=1 path=lead-empty
+         base ["s", ["h"], [], []] = s://h ; ref [1, [""]] -> URI ref ""
+         CRI resolution: s://h/   RFC 3986: s://h
+   1020  base=host | discard=2 path=none
+         base ["s", ["h"], [], []] = s://h ; ref [2] -> URI ref "../"
+         CRI resolution: s://h   RFC 3986: s://h/
+   1020  base=host | discard=2 path=empty
+         base ["s", ["h"], [], []] = s://h ; ref [2, []] -> URI ref "../"
+         CRI resolution: s://h   RFC 3986: s://h/
+   1020  base=host | discard=3 path=none
+         base ["s", ["h"], [], []] = s://h ; ref [3] -> URI ref "../../"
+         CRI resolution: s://h   RFC 3986: s://h/
+   1020  base=host | discard=3 path=empty
+         base ["s", ["h"], [], []] = s://h ; ref [3, []] -> URI ref "../../"
+         CRI resolution: s://h   RFC 3986: s://h/
+   1020  base=host | discard=4 path=none
+         base ["s", ["h"], [], []] = s://h ; ref [4] -> URI ref "../../../"
+         CRI resolution: s://h   RFC 3986: s://h/
+   1020  base=host | discard=4 path=empty
+         base ["s", ["h"], [], []] = s://h ; ref [4, []] -> URI ref "../../../"
+         CRI resolution: s://h   RFC 3986: s://h/
+   1012  base=host | discard=1 path=none
+         base ["s", ["h"], [""], []] = s://h/ ; ref [1] -> URI ref ""
+         CRI resolution: s://h   RFC 3986: s://h/
+   1012  base=host | discard=1 path=empty
+         base ["s", ["h"], [""], []] = s://h/ ; ref [1, []] -> URI ref ""
+         CRI resolution: s://h   RFC 3986: s://h/
+   1012  base=host | discard=True path=none
+         base ["s", ["h"], [""], []] = s://h/ ; ref [true] -> URI ref ""
+         CRI resolution: s://h   RFC 3986: s://h/
+   1012  base=host | discard=True path=empty
+         base ["s", ["h"], [""], []] = s://h/ ; ref [true, []] -> URI ref ""
+         CRI resolution: s://h   RFC 3986: s://h/
+    170  base=host | discard=0 path=none query=[]
+         base ["s", ["h"], [], ["q"]] = s://h?q ; ref [0, null, []] -> URI ref ""
+         CRI resolution: s://h   RFC 3986: s://h?q
+
+FIXED: pairs 831300, reference not convertible 117640, compared 713660, mismatches 0 (resolution gave invalid CRI in 0)

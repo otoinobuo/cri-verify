@@ -1,0 +1,3 @@
+check 1: rooted paths 1364 mismatches 0
+check 2 (draft): host bases x discard refs: 21420 compared, 6300 skipped (not convertible), mismatches 0
+check 2 (fixed): host bases x discard refs: 19320 compared, 8400 skipped (not convertible), mismatches 0
