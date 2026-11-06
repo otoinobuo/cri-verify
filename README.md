@@ -2,7 +2,9 @@
 
 Companion code and proofs for the preprint
 *Three Counterexamples and One-Sentence Corrections for IETF Internet-Draft draft-ietf-core-href-30, with a Lean Proof for the Path Rule*
-(Nobuo Otoi, BA Cybersecurity, October 2026; doi:[10.5281/zenodo.23760463](https://doi.org/10.5281/zenodo.23760463)).
+(Nobuo Otoi, ba-cybersecurity.com, October 2026; doi:[10.5281/zenodo.23760463](https://doi.org/10.5281/zenodo.23760463)).
+
+Summary and citation: https://ba-cybersecurity.com/research/cri-reference-resolution/
 
 It compares CRI reference resolution and conversion (draft-ietf-core-href-30, Sections 5.3 and 6.1) with RFC 3986 Section 5.2.
 
