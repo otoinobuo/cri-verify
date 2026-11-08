@@ -6,6 +6,8 @@ Companion code and proofs for the preprint
 
 Summary and citation: https://ba-cybersecurity.com/research/cri-reference-resolution/
 
+Status: an author replied on the CoRE list (31 Oct 2026; [thread](https://mailarchive.ietf.org/arch/msg/core/-NcPlOqyQ7zBjVTH8PIJy5Os1Gs)) that the necessary corrections will be made; not yet in a published revision.
+
 It compares CRI reference resolution and conversion (draft-ietf-core-href-30, Sections 5.3 and 6.1) with RFC 3986 Section 5.2.
 
 ## Contents
